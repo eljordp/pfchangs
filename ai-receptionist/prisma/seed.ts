@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, CallStatus } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -53,7 +53,7 @@ async function main() {
 
   // Create sample call sessions
   const intents = ['info_request', 'appointment', 'employment', 'vendor', 'transfer'];
-  const statuses = ['COMPLETED', 'COMPLETED', 'COMPLETED', 'IN_PROGRESS', 'FAILED'];
+  const statuses: CallStatus[] = ['COMPLETED', 'COMPLETED', 'COMPLETED', 'IN_PROGRESS', 'FAILED'];
 
   const callSessions = [];
   for (let i = 0; i < 20; i++) {
