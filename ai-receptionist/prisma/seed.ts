@@ -60,7 +60,7 @@ async function main() {
     const daysAgo = Math.floor(Math.random() * 7);
     const caller = callers[Math.floor(Math.random() * callers.length)];
     const intent = intents[Math.floor(Math.random() * intents.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    const status: CallStatus = statuses[Math.floor(Math.random() * statuses.length)] as CallStatus;
 
     const startTime = new Date();
     startTime.setDate(startTime.getDate() - daysAgo);
