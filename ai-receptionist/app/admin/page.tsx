@@ -236,7 +236,7 @@ export default function AdminDashboard() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/[0.04]">
-                  {['Caller', 'Intent', 'Status', 'Time', 'Resolved', 'Actions'].map((h) => (
+                  {['Caller', 'Type', 'Intent', 'Status', 'Time', 'Resolved', 'Summary', 'Actions'].map((h) => (
                     <th key={h} className="px-6 py-3 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">
                       {h}
                     </th>
@@ -247,6 +247,11 @@ export default function AdminDashboard() {
                 {data.recentActivity.map((activity) => (
                   <tr key={activity.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-6 py-4 text-sm font-medium">{activity.caller}</td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-400">
+                        {activity.type}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-400">{activity.intent || 'N/A'}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${
@@ -267,6 +272,9 @@ export default function AdminDashboard() {
                         <span className="text-gray-600">No</span>
                       )}
                     </td>
+                    <td className="px-6 py-4 text-sm text-gray-500 max-w-[200px] truncate">
+                      {activity.summary || 'No summary'}
+                    </td>
                     <td className="px-6 py-4">
                       <button
                         onClick={() => setSelectedCall(activity.id)}
@@ -279,7 +287,7 @@ export default function AdminDashboard() {
                 ))}
                 {data.recentActivity.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-600 text-sm">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-600 text-sm">
                       No recent activity
                     </td>
                   </tr>
