@@ -1,0 +1,320 @@
+// Prisma schema for P.F. Chang's AI Receptionist
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Authentication & Admin Users
+// ============================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(STAFF)
+  hashedPassword String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  @@index([email])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+// ============================================================================
+// Callers & Contact Information
+// ============================================================================
+
+model Caller {
+  id          String   @id @default(cuid())
+  phoneNumber String?  @unique
+  email       String?
+  firstName   String?
+  lastName    String?
+  company     String?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  callSessions  CallSession[]
+  chatSessions  ChatSession[]
+  appointments  Appointment[]
+
+  @@index([phoneNumber])
+  @@index([email])
+}
+
+// ============================================================================
+// Voice Call Management
+// ============================================================================
+
+model CallSession {
+  id              String        @id @default(cuid())
+  twilioCallSid   String        @unique
+  callerId        String?
+  phoneNumber     String
+  direction       CallDirection @default(INBOUND)
+  status          CallStatus    @default(INITIATED)
+  startTime       DateTime      @default(now())
+  endTime         DateTime?
+  duration        Int?          // seconds
+  recordingUrl    String?
+  transcription   String?       @db.Text
+  intent          String?       // classified intent
+  resolved        Boolean       @default(false)
+  resolutionType  String?       // e.g., "appointment_scheduled", "info_provided", "transferred"
+  notes           String?       @db.Text
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  caller          Caller?       @relation(fields: [callerId], references: [id])
+  messages        CallMessage[]
+  metrics         CallMetrics?
+
+  @@index([twilioCallSid])
+  @@index([callerId])
+  @@index([startTime])
+  @@index([intent])
+}
+
+model CallMessage {
+  id            String      @id @default(cuid())
+  callSessionId String
+  role          MessageRole
+  content       String      @db.Text
+  timestamp     DateTime    @default(now())
+
+  callSession CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+
+  @@index([callSessionId])
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  BUSY
+  NO_ANSWER
+}
+
+// ============================================================================
+// Web Chat Management
+// ============================================================================
+
+model ChatSession {
+  id          String        @id @default(cuid())
+  callerId    String?
+  sessionId   String        @unique // Browser session identifier
+  status      ChatStatus    @default(ACTIVE)
+  startTime   DateTime      @default(now())
+  endTime     DateTime?
+  intent      String?
+  resolved    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  caller      Caller?       @relation(fields: [callerId], references: [id])
+  messages    ChatMessage[]
+
+  @@index([sessionId])
+  @@index([callerId])
+}
+
+model ChatMessage {
+  id            String      @id @default(cuid())
+  chatSessionId String
+  role          MessageRole
+  content       String      @db.Text
+  timestamp     DateTime    @default(now())
+
+  chatSession ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+  @@index([chatSessionId])
+  @@index([timestamp])
+}
+
+enum ChatStatus {
+  ACTIVE
+  ENDED
+  TRANSFERRED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ============================================================================
+// Appointments
+// ============================================================================
+
+model Appointment {
+  id              String            @id @default(cuid())
+  callerId        String?
+  contactName     String
+  contactPhone    String
+  contactEmail    String?
+  scheduledFor    DateTime
+  duration        Int               @default(30) // minutes
+  type            AppointmentType
+  purpose         String            @db.Text
+  status          AppointmentStatus @default(SCHEDULED)
+  notes           String?           @db.Text
+  reminderSent    Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  caller Caller? @relation(fields: [callerId], references: [id])
+
+  @@index([callerId])
+  @@index([scheduledFor])
+  @@index([status])
+}
+
+enum AppointmentType {
+  VENDOR_MEETING
+  INTERVIEW
+  DELIVERY
+  MAINTENANCE
+  GENERAL
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// ============================================================================
+// Metrics & Analytics
+// ============================================================================
+
+model CallMetrics {
+  id                    String   @id @default(cuid())
+  callSessionId         String   @unique
+  firstResponseTime     Int?     // milliseconds
+  averageResponseTime   Int?     // milliseconds
+  totalInteractions     Int      @default(0)
+  customerSentiment     String?  // positive, neutral, negative
+  intentAccuracy        Float?   // 0.0 to 1.0
+  createdAt             DateTime @default(now())
+
+  callSession CallSession @relation(fields: [callSessionId], references: [id], onDelete: Cascade)
+
+  @@index([callSessionId])
+}
+
+model DailyMetrics {
+  id                     String   @id @default(cuid())
+  date                   DateTime @unique @db.Date
+  totalCalls             Int      @default(0)
+  totalChats             Int      @default(0)
+  averageCallDuration    Float?   // seconds
+  averageChatDuration    Float?   // seconds
+  appointmentsScheduled  Int      @default(0)
+  resolvedCalls          Int      @default(0)
+  resolvedChats          Int      @default(0)
+  topIntents             Json?    // Array of {intent: string, count: number}
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([date])
+}
+
+// ============================================================================
+// FAQ & Knowledge Base
+// ============================================================================
+
+model FaqEntry {
+  id        String   @id @default(cuid())
+  question  String   @db.Text
+  answer    String   @db.Text
+  category  String?
+  keywords  String[] // For search/matching
+  active    Boolean  @default(true)
+  usageCount Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([active])
+}
+
+// ============================================================================
+// System Configuration
+// ============================================================================
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  type      String   // "string", "number", "boolean", "json"
+  category  String   // "twilio", "openai", "business", "features"
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([category])
+}
