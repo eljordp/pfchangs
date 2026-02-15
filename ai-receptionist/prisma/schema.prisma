@@ -92,6 +92,7 @@ model Caller {
   callSessions  CallSession[]
   chatSessions  ChatSession[]
   appointments  Appointment[]
+  orders        Order[]
 
   @@index([phoneNumber])
   @@index([email])
@@ -123,6 +124,7 @@ model CallSession {
   caller          Caller?       @relation(fields: [callerId], references: [id])
   messages        CallMessage[]
   metrics         CallMetrics?
+  orders          Order[]
 
   @@index([twilioCallSid])
   @@index([callerId])
@@ -175,6 +177,7 @@ model ChatSession {
 
   caller      Caller?       @relation(fields: [callerId], references: [id])
   messages    ChatMessage[]
+  orders      Order[]
 
   @@index([sessionId])
   @@index([callerId])
@@ -246,6 +249,63 @@ enum AppointmentStatus {
   COMPLETED
   CANCELLED
   NO_SHOW
+}
+
+// ============================================================================
+// Orders & Revenue
+// ============================================================================
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  callSessionId   String?
+  chatSessionId   String?
+  callerId        String?
+  type            OrderType
+  status          OrderStatus @default(PENDING)
+  items           Json                          // Array of {name, quantity, unitPrice}
+  subtotal        Float
+  tax             Float       @default(0)
+  deliveryFee     Float       @default(0)
+  discount        Float       @default(0)
+  total           Float
+  guestCount      Int?
+  eventDate       DateTime?
+  deliveryAddress String?     @db.Text
+  specialNotes    String?     @db.Text
+  timeToOrder     Int?                          // Seconds from call start to order placement
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  callSession     CallSession? @relation(fields: [callSessionId], references: [id])
+  chatSession     ChatSession? @relation(fields: [chatSessionId], references: [id])
+  caller          Caller?      @relation(fields: [callerId], references: [id])
+
+  @@index([callSessionId])
+  @@index([chatSessionId])
+  @@index([callerId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([type])
+}
+
+enum OrderType {
+  CATERING
+  CORPORATE_EVENT
+  BULK_ORDER
+  VENDOR_PURCHASE
+  GIFT_CARD_BULK
+  OTHER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
 }
 
 // ============================================================================
